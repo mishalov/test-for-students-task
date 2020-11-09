@@ -11,7 +11,7 @@ function setColumn(table, f, c, rs = 0, re = table.length) {
   return output;
 }
 
-function toInt(c) {
+function toInt(c, delim) {
   const table = new Array(10)
     .fill("")
     .map(() =>
@@ -22,14 +22,14 @@ function toInt(c) {
 
   return {
     name: "int",
-    command: `./main int ${c}`,
-    delim: ",",
+    command: `./main ${delim ? `-d ${delim}` : ""} int ${c}`,
+    delim,
     output,
     table,
   };
 }
 
-function cSet(c) {
+function cSet(c, delim) {
   const table = new Array(10)
     .fill("")
     .map(() =>
@@ -40,14 +40,14 @@ function cSet(c) {
 
   return {
     name: "cset",
-    command: `./main cset ${c} aaa`,
-    delim: ",",
+    command: `./main ${delim ? `-d ${delim}` : ""} cset ${c} aaa`,
+    delim,
     output,
     table,
   };
 }
 
-function toLower(c) {
+function toLower(c, delim) {
   const table = new Array(10)
     .fill("")
     .map(() => new Array(10).fill("").map(() => randomWord().toUpperCase()));
@@ -57,14 +57,17 @@ function toLower(c) {
 
   return {
     name: "tolower",
-    command: `./main tolower ${c}`,
-    delim: ",",
+    command: `./main ${delim ? `-d ${delim}` : ""} tolower ${c} `,
+    delim,
     output,
     table,
   };
 }
 
-const tables = [toInt(2), cSet(1), toLower(1)];
+const tables = [toInt(2, ","),
+cSet(1, ","),
+toLower(1, ",")
+];
 
 function compare() {
   for (tableItem of tables) {
@@ -91,68 +94,36 @@ function compare() {
         `${tableItem.command} <  ${inputTableName} > ${outputTestedTableName}`
       );
 
-      const resultOfProgram = fs.readFileSync(outputTestedTableName).toString();
-      const ourResult = fs.readFileSync(outputTableName).toString();
+      const resultOfProgram = fs.readFileSync(outputTestedTableName).toString().split("\n").map(el => el.split(tableItem.delim));
+      const ourResult = fs.readFileSync(outputTableName).toString().split("\n").map(el => el.split(tableItem.delim));
 
-      if (ourResult !== resultOfProgram) {
-        const diffs = diff(ourResult, resultOfProgram, 0);
-        if (diffs.length > 2) {
-          console.log(
-            "\x1b[31m",
-            `Проверяю ${tableItem.name}, команда \x1b[37m ${tableItem.command}\x1b[0m:`
-          );
-          let error = "";
-          diffs.forEach((diff, index) => {
-            if (diff[0] == -1) {
-              error += `${
-                index > 0
-                  ? `\x1b[32m${
-                      diffs[index - 1][0] == 0 &&
-                      diffs[index - 1][1] !== tableItem.delim
-                        ? diffs[index - 1][1]
-                        : ""
-                    }`
-                  : ""
-              }\x1b[31m${diff[1]}${
-                index < diffs.length - 1
-                  ? `\x1b[32m${
-                      diffs[index + 1][0] == 0 &&
-                      diffs[index + 1][1] !== tableItem.delim
-                        ? diffs[index + 1][1]
-                        : ""
-                    }`
-                  : ""
-              }`;
-            } else {
-              if (diff[0] == 1) {
-                error += `${
-                  index > 0
-                    ? `\x1b[32m${
-                        diffs[index - 1][0] == 0 &&
-                        diffs[index - 1][1] !== tableItem.delim
-                          ? diffs[index - 1][1]
-                          : ""
-                      }`
-                    : ""
-                }\x1b[35m${diff[1]}${
-                  index < diffs.length - 1
-                    ? `\x1b[32m${
-                        diffs[index + 1][0] == 0 &&
-                        diffs[index + 1][1] !== tableItem.delim
-                          ? diffs[index + 1][1]
-                          : ""
-                      }`
-                    : ""
-                }`;
-              }
-            }
-          });
-          console.log(error);
+      if (JSON.stringify(ourResult) !== JSON.stringify(resultOfProgram)) {
 
-          throw "Result is Wrong!";
+        if (ourResult.length !== resultOfProgram.length) {
+          console.log(`\x1b[32m Количество строк неверное! должно быть : ${ourResult.length} а получили : ${resultOfProgram.length}`);
+          continue;
         }
-        console.log("\x1b[32m", "All ok with", dir);
+
+        if (ourResult[0].length !== resultOfProgram[0].length) {
+          console.log(`\x1b[32m Количество колонок неверное! должно быть : ${ourResult[0].length} а получили : ${resultOfProgram[0].length}`);
+          continue;
+        }
+
+
+        for (let i = 0; i < resultOfProgram.length; i++) {
+          const row = resultOfProgram[i];
+          let rowOutput = "";
+          for (let j = 0; j < row.length && row.length !== 1; j++) {
+            const modifier = resultOfProgram[i][j] !== ourResult[i][j] ? "\x1b[32m" : "\x1b[31m"
+            rowOutput += `${modifier}${row[j]}`
+            if (j != row.length - 1) {
+              rowOutput += tableItem.delim;
+            }
+          }
+          console.log(rowOutput);
+        }
       }
+      console.log("\x1b[32m", "All ok with", dir);
 
       // exec(, (error, stdout, stderr) => {});
     } catch (e) {
